@@ -1,0 +1,43 @@
+name: Deploy Easybank website to VPS
+
+on:
+  push:
+    branches:
+      - main # Trigger on push to the main branch
+  pull_request:
+    branches:
+      - main # Trigger on pull request to the main branch
+
+jobs:
+  deploy:
+    environment: Production
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@master
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Production
+        run: npm run build
+
+      - name: Deploy to VPS
+        run: |
+          which ssh-agent || ( apt update -y && apt install openssh-client -y )
+          which rsync || ( apt install rsync -y )
+          eval $(ssh-agent -s)
+          ssh-add <(echo "$SSH_PRIVATE_KEY" )
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan $SSH_HOST >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          scp -r dist/* $SSH_USER@$SSH_HOST:/var/www/easybank.abubaker-dev.com/
+    env:
+      SSH_PRIVATE_KEY: ${{secrets.SSH_PRIVATE_KEY}}
+      SSH_HOST: ${{secrets.VPS_HOST}}
+      SSH_USER: ${{secrets.VPS_USER}}
+      CI: false
